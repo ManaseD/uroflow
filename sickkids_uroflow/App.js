@@ -7,9 +7,12 @@ import { Ionicons } from "@expo/vector-icons";
 import LoadingPage from "./LoadingPage";
 import LoginPage from "./LoginPage";
 import HistoryPage from "./HistoryPage";
+import ReplayPage from "./Replay";
 import RecordPage from "./RecordPage";
 import ProfilePage from "./ProfilePage";
 import ResultPage from "./ResultPage"
+
+console.disableYellowBox = true;
 
 const getTabBarIcon = (navigation, focused, tintColor) => {
     const { routeName } = navigation.state;
@@ -35,7 +38,8 @@ const RecordStack = createStackNavigator({
 });
 
 const HistoryStack = createStackNavigator({
-    History: HistoryPage
+    History: HistoryPage,
+    Replay: ReplayPage
 });
 
 
@@ -57,7 +61,10 @@ const MainStack = createBottomTabNavigator(
         }),
         tabBarOptions: {
             activeTintColor: "tomato",
-            inactiveTintColor: "gray"
+            inactiveTintColor: "gray",
+            style: {
+                borderTopColor: 'transparent'
+            }
         }
     }
 );

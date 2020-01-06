@@ -1,307 +1,209 @@
 import React from "react";
 import { Audio } from "expo-av";
+import { Text, View, Alert, TextInput, ScrollView, StyleSheet, Dimensions, TouchableHighlight } from "react-native";
+import app from "./feathers-client.js"
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, View, Button, Alert } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import * as Font from "expo-font";
 
-import CheckBox from "react-native-check-box";
-import {
-    StyleSheet,
-    TextInput,
-    ScrollView,
-    KeyboardAvoidingView
-} from "react-native";
+const { width: DEVICE_WIDTH, height: DEVICE_HEIGHT } = Dimensions.get('window')
 
-import config from "./config.json";
-const url = config.url;
-
-import { getJWT } from "./utils/auth";
-
-const RecordOption = {
-    android: {
-        extension: ".wav",
-        outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
-        audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
-        sampleRate: 44100,
-        numberOfChannels: 2,
-        bitRate: 128000
-    },
-    ios: {
-        extension: ".wav",
-        outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_LINEARPCM,
-        audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_MAX,
-        sampleRate: 44100,
-        numberOfChannels: 2,
-        bitRate: 128000,
-        linearPCMBitDepth: 16,
-        linearPCMIsBigEndian: false,
-        linearPCMIsFloat: false
-    }
-};
-import Constants from "expo-constants";
-const { manifest } = Constants;
 class ResultPage extends React.Component {
-    constructor(props) {
-        super(props);
-        this.sound = null;
-        this.state = {
-            getted_uri: this.props.navigation.getParam(
-                "uri_info",
-                "nothing sent"
-            ),
+  constructor(props) {
+    super(props);
+    this.state = {
+      file_url: this.props.navigation.getParam("uri_info", "nothing sent"),
+      content_uri: this.props.navigation.getParam("contentURI"),
+      length: this.props.navigation.getParam("length"),
+      description: "",
+    };
+  }
 
-            description: "",
-            firstChecked: false,
-            secondChecked: false,
-            thirdChecked: false,
-            forthChecked: false,
-            fifthChecked: false
-        };
-        // this.recordingSettings = JSON.parse(JSON.stringify(Audio.RECORDING_OPTIONS_PRESET_LOW_QUALITY));
-        this.recordingSettings = JSON.parse(JSON.stringify(RecordOption));
+  componentDidMount() {
+    (async () => {
+      await Font.loadAsync({
+        'Avenir': require('./assets/fonts/Avenir-Book.ttf'),
+        'Avenir-Heavy': require('./assets/fonts/Avenir-Roman.ttf'),
+        'Avenir-Light': require('./assets/fonts/Avenir-Light.ttf'),
+      })
+    })()
+  }
+
+  async _stopRecordingAndEnablePlayback() {
+    const { file_url } = this.state
+    const soundObject = new Audio.Sound()
+
+    try {
+      await soundObject.loadAsync({ uri: file_url });
+      await soundObject.playAsync();
+    } catch (error) {
+      console.warn(error);
     }
+  }
 
-    async _stopRecordingAndEnablePlayback() {
-        asset_path = this.props.navigation.getParam("uri_info", "nothing sent");
-        const playbackObject = await Audio.Sound.createAsync(
-            { uri: asset_path },
-            { shouldPlay: true }
-        );
-        this.sound = playbackObject;
-    }
+  sendAudio = () => {
+    const { file_url, description, content_uri, length } = this.state
+    const file_arr = file_url.split(".")
+    const file_type = file_arr[file_arr.length - 1]
 
-    sendAudio = () => {
-        const formData = new FormData();
-        // Get dat file in
-        const fileUri = this.state.getted_uri;
-        const fileInfoList = fileUri.split(".");
-        const fileExtension = fileInfoList[fileInfoList.length - 1];
-        formData.append("INPUT-FIELD-NAME-HERE", {
-            uri: this.state.getted_uri,
-            name: "test1." + fileExtension
-        });
+    app.service("audio").create({ file_url, description, content_uri, file_type, length })
 
-        // Get other info
-        // formData.append("userId", "1");
-        formData.append("comment", this.state.description);
-        // CHANGE LOCAL IP ADDRESS BEFORE RUN THE CODE HERE FOR NOW!
+    this.props.navigation.navigate('History')
+  };
 
-        const data_base_url = url
-            ? `${url}/upload`
-            : `http://${manifest.debuggerHost
-                  .split(`:`)
-                  .shift()
-                  .concat(`:3001/upload`)}`; // Switch to the route you want to use
+  sendPressed = () => {
+    Alert.alert(
+      "Send Recording",
+      "Are you sure you want to send this audio recording? ",
+      [
+        {
+          text: "Cancel",
+          onPress: () => {
+            console.log("Send: Cancel Pressed");
+          },
+          style: "cancel"
+        },
+        {
+          text: "Send",
+          onPress: () => {
+            console.log("Send: Send Pressed");
+            this.sendAudio();
+          }
+        }
+      ],
+      { cancelable: false }
+    );
+  };
 
-        getJWT()
-            .then(token => {
-                return fetch(data_base_url, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "multipart/form-data"
-                    },
-                    body: formData
-                });
-            })
-            .then(response => {
-                if (response.status === 200) {
-                    Alert.alert("Success", "Audio uploaded");
-                    console.log("ResultPage: upload succeed");
-                } else if (response.status === 400) {
-                    alert(`Bad request, file upload failed`);
-                    console.log("ResultPage: bad request");
-                    response.json().then(body => console.log(body));
-                }
-                this.props.navigation.goBack();
-            })
-            .catch(err => {
-                console.error(err);
-            });
-    };
+  _onRecordPressed = () => {
+    this._stopRecordingAndEnablePlayback();
+  };
 
-    sendPressed = () => {
-        Alert.alert(
-            "Send Recording",
-            "Are you sure you want to send this audio recording? ",
-            [
-                {
-                    text: "Cancel",
-                    onPress: () => {
-                        console.log("Send: Cancel Pressed");
-                    },
-                    style: "cancel"
-                },
-                {
-                    text: "Send",
-                    onPress: () => {
-                        console.log("Send: Send Pressed");
-                        this.sendAudio();
-                    }
-                }
-            ],
-            { cancelable: false }
-        );
-    };
+  render() {
+    const { description } = this.state
+    const { navigation } = this.props
 
-    _onRecordPressed = () => {
-        this._stopRecordingAndEnablePlayback();
-    };
-
-    handleDescription = text => {
-        this.setState({ description: text });
-    };
-
-    render() {
-        return (
-            <ScrollView>
-                <View
-                    style={{
-                        flexDirection: "column",
-                        position: "relative",
-                        marginTop: 3,
-                        marginBottom: 1,
-                        flex: 1
-                    }}
-                >
-                    <View
-                        style={{
-                            marginTop: 2,
-                            marginBottom: 1,
-                            top: 10,
-                            flex: 1,
-                            flexDirection: "column",
-                            // justifyContent: "center",
-                            alignItems: "center"
-                        }}
-                    >
-                        <Text> result will be displayed here.</Text>
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                marginTop: 20,
-                                marginBottom: 10,
-                                alignItems: "center"
-                            }}
-                        >
-                            <Ionicons
-                                name="md-play-circle"
-                                size={50}
-                                color="red"
-                            />
-                            <Button
-                                title="Play Now"
-                                color="blue"
-                                onPress={this._onRecordPressed}
-                            ></Button>
-                        </View>
-                    </View>
-
-                    <View>
-                        <TextInput
-                            style={{
-                                // width: 230,
-                                margin: "10%",
-                                height: 40,
-                                borderColor: "black",
-                                borderBottomWidth: 1,
-                                borderTopWidth: 1,
-                                justifyContent: "flex-end"
-                            }}
-                            underlineColorAndroid="transparent"
-                            placeholder="Description:"
-                            placeholderTextColor="#9a73ef"
-                            autoCapitalize="none"
-                            textAlign="left"
-                            multiline
-                            numberOfLines={5}
-                            onChangeText={this.handleDescription}
-                            value={this.state.description}
-                        />
-                    </View>
-
-                    <View>
-                        <CheckBox
-                            style={{ flex: 1, paddingRight: "20%" }}
-                            onClick={() => {
-                                this.setState({
-                                    firstChecked: !this.state.firstChecked
-                                });
-                            }}
-                            isChecked={this.state.firstChecked}
-                            leftText={"symptom 1"}
-                            leftTextStyle={{ paddingLeft: "20%" }}
-                        />
-                        <CheckBox
-                            style={{ flex: 1, paddingRight: "20%" }}
-                            onClick={() => {
-                                this.setState({
-                                    secondChecked: !this.state.secondChecked
-                                });
-                            }}
-                            isChecked={this.state.secondChecked}
-                            leftText={"symptom 2"}
-                            leftTextStyle={{ paddingLeft: "20%" }}
-                        />
-                        <CheckBox
-                            style={{ flex: 1, paddingRight: "20%" }}
-                            onClick={() => {
-                                this.setState({
-                                    thirdChecked: !this.state.thirdChecked
-                                });
-                            }}
-                            isChecked={this.state.thirdChecked}
-                            leftText={"symptom 3"}
-                            leftTextStyle={{ paddingLeft: "20%" }}
-                        />
-                        <CheckBox
-                            style={{ flex: 1, paddingRight: "20%" }}
-                            onClick={() => {
-                                this.setState({
-                                    forthChecked: !this.state.forthChecked
-                                });
-                            }}
-                            isChecked={this.state.forthChecked}
-                            leftText={"symptom 4"}
-                            leftTextStyle={{ paddingLeft: "20%" }}
-                        />
-                        <CheckBox
-                            style={{ flex: 1, paddingRight: "20%" }}
-                            onClick={() => {
-                                this.setState({
-                                    fifthChecked: !this.state.fifthChecked
-                                });
-                            }}
-                            isChecked={this.state.fifthChecked}
-                            leftText={"symptom 5"}
-                            leftTextStyle={{ paddingLeft: "20%" }}
-                        />
-                    </View>
-
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            marginTop: 15,
-                            marginBottom: 40,
-                            flex: 1,
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            alignItems: "center"
-                        }}
-                    >
-                        <Button
-                            title="Send recording"
-                            onPress={this.sendPressed}
-                        ></Button>
-                        <Button
-                            title="Re-record"
-                            color="red"
-                            onPress={() => this.props.navigation.goBack()}
-                        ></Button>
-                    </View>
+    return (
+      <KeyboardAwareScrollView>
+        <ScrollView>
+          <View style={styles.container}>
+            <LinearGradient colors={['#fff', '#E4E5E6']} style={styles.gradient}>
+              <View style={styles.infoContainer}>
+                <Text style={{ fontSize: 22, fontFamily: "Avenir-Heavy"}}>Playback</Text>
+              </View>
+              <View style={styles.recordButtonContainer}>
+                <TouchableHighlight style={styles.microphone} onPress={this._onRecordPressed}>
+                  <Ionicons color="#fff" name='ios-play' size={120} style={{backgroundColor: 'transparent', marginLeft: 13, marginTop: 5}}/>
+                </TouchableHighlight>
+              </View>
+              <View style={styles.recordingDataContainer}>
+                <TextInput
+                  style={styles.description}
+                  underlineColorAndroid="transparent"
+                  placeholder="Add a Title..."
+                  placeholderTextColor="#424242"
+                  onChangeText={(description) => this.setState({ description })}
+                  value={description}
+                />
+                <View style={{display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
+                  <TouchableHighlight style={styles.deleteButton} onPress={() => navigation.goBack()}>
+                    <Text style={{color: '#ffffff', fontFamily: 'Avenir-Heavy', fontSize: 16}}> DELETE </Text>
+                  </TouchableHighlight>
+                  <TouchableHighlight style={styles.submitButton} onPress={this.sendPressed}>
+                    <Text style={{color: '#ffffff', fontFamily: 'Avenir-Heavy', fontSize: 16}}> SUBMIT </Text>
+                  </TouchableHighlight>
                 </View>
-            </ScrollView>
-        );
-    }
+              </View>
+            </LinearGradient>
+          </View>
+        </ScrollView>
+      </KeyboardAwareScrollView>
+    );
+  }
 }
+
+ResultPage.navigationOptions = {
+  title: "Review Audio"
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    minWidth: DEVICE_WIDTH,
+    maxWidth: DEVICE_WIDTH,
+    minHeight: DEVICE_HEIGHT,
+    maxHeight: DEVICE_HEIGHT,
+  },
+  infoContainer: {
+    top: '10%'
+  },
+  description: {
+    marginTop: 12,
+    marginBottom: 12,
+    fontSize: 16,
+    width: '60%',
+    textAlign: 'left',
+    borderWidth: 1,
+    borderColor: 'rgb(200,200,200)',
+    borderRadius: 3,
+    padding: 5,
+    fontWeight: '700'
+  },
+  deleteButton: {
+    alignItems: 'center',
+    width: '40%',
+    margin: 10,
+    borderRadius: 30,
+    backgroundColor: '#b71c1c',
+    padding: 10
+  },
+  recordButtonContainer: {
+    top: '20%',
+    backgroundColor: 'transparent'
+  },
+  submitButton: {
+    alignItems: 'center',
+    width: '40%',
+    margin: 10,
+    borderRadius: 30,
+    backgroundColor: '#3f51b5',
+    padding: 10
+  },
+  microphone: {
+    backgroundColor: '#b71c1c',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  gradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '100%',
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  recordingDataContainer: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    height: '35%',
+    backgroundColor: 'white',
+    alignItems: 'center',
+  },
+})
 
 export default ResultPage;
