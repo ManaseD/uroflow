@@ -8,7 +8,7 @@ Furthermore, this would prove to be useful in settings where a clinician would l
 
 ## Demo
 
-<img src="https://github.com/hamzanadeveloper/uroflow/blob/master/demo.gif?raw=true" width="300" />
+<img src="https://github.com/ManaseD/uroflow/blob/master/demo.gif?raw=true" width="300" />
 
 ## Technologies 
 
